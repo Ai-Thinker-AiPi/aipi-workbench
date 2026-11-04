@@ -173,3 +173,22 @@ Agent ──tool──▶ index.js ──队列──▶ GET /aipi-workbench/age
 4. workbench_validate 校验通过
 5. workbench_compile 拿 DSL
 6. workbench_save_project 存盘
+
+### 串口服务
+
+宿主侧用 `serialport`（`optionalDependencies`，装不上插件照常启动）提供四个工具：
+
+| 工具 | 作用 |
+| --- | --- |
+| workbench_serial_ports | 枚举 COM 口 |
+| workbench_push | 编译 → 打 AIPI 帧 → 写串口 → 读回 self-test；`dry:true` 只打包 |
+| workbench_serial_read | 打开串口读 N 毫秒日志 |
+| workbench_serial_close | 关闭连接 |
+
+帧格式（`export function frameDsl` 可直接单测）：
+
+```
+'AIPI' | ver(1) | type(1=DSL) | len(u32 LE) | payload(UTF-8 JSON) | checksum(u16 LE = 字节和)
+```
+
+自测：`node scripts/check.mjs` 里有打包/解包往返断言（magic、长度、payload、校验和、总长）。

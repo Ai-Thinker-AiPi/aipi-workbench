@@ -42,5 +42,8 @@
     "workbench"
   ],
   "author": "Ai-Thinker",
-  "license": "MIT"
+  "license": "MIT",
+  "optionalDependencies": {
+    "serialport": "^13.0.0"
+  }
 }

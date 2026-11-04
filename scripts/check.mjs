@@ -131,10 +131,33 @@ if (applied !== undefined) fail('宿主 apply 返回了 ' + typeof applied + '�
 if (host.inject.indexOf('tools') < 0) fail('宿主 inject 缺 tools');
 
 ['workbench_state', 'workbench_add_plugin', 'workbench_remove_plugin', 'workbench_set_rules',
-    'workbench_validate', 'workbench_compile', 'workbench_simulate', 'workbench_save_project', 'workbench_open_project']
+    'workbench_validate', 'workbench_compile', 'workbench_simulate', 'workbench_save_project', 'workbench_open_project',
+    'workbench_serial_ports', 'workbench_push', 'workbench_serial_read', 'workbench_serial_close']
     .forEach((n) => { if (hostTools.indexOf(n) < 0) fail('没注册工具：' + n); });
 ['/aipi-workbench/agent/poll', '/aipi-workbench/agent/result', '/aipi-workbench/agent/dev']
     .forEach((r) => { if (hostRoutes.indexOf(r) < 0) fail('没注册路由：' + r); });
 
 console.log('  宿主工具       ' + hostTools.join(' / '));
 console.log('  宿主路由       ' + hostRoutes.join(' / '));
+
+// ── 串口帧：打包 / 解包往返 ────────────────────────────────────────────
+const frameSandbox = { ...hostSandbox, Buffer };
+frameSandbox.globalThis = frameSandbox;
+vm.createContext(frameSandbox);
+vm.runInContext(hostSrc + '\n;globalThis.__frames = { frameDsl, sum16 };', frameSandbox, { filename: 'index.js' });
+const { frameDsl, sum16 } = frameSandbox.__frames;
+
+const sample = { version: '0.2', host: 'AiPi-NodeMCU-Hub', channels: [{ uart: 'UART1' }], rules: [{ when: { event: 'person_enter' } }] };
+const frame = frameDsl(sample);
+const magic = frame.subarray(0, 4).toString('ascii');
+const len = frame.readUInt32LE(6);
+const payload = frame.subarray(10, 10 + len).toString('utf8');
+const crc = frame.readUInt16LE(10 + len);
+if (magic !== 'AIPI') fail('帧头不对：' + magic);
+if (frame[4] !== 1 || frame[5] !== 1) fail('帧版本/类型不对');
+if (len !== Buffer.byteLength(payload, 'utf8')) fail('长度字段与 payload 不符');
+if (JSON.stringify(JSON.parse(payload)) !== JSON.stringify(sample)) fail('payload 往返不一致');
+if (crc !== sum16(Buffer.from(payload, 'utf8'))) fail('校验和不一致');
+if (frame.length !== 10 + len + 2) fail('帧总长不对：' + frame.length);
+
+console.log('  串口帧         ' + frame.length + ' 字节，magic=' + magic + '，往返一致');

@@ -53,7 +53,79 @@ const ROUTE_DEV = '/aipi-workbench/agent/dev';
 /** 等待浏览器执行的最长时间（毫秒）：面板没开时不要卡住模型。 */
 const CMD_TIMEOUT_MS = 12000;
 
+/** 工具名 → 执行函数：dev 路由靠它做本机自测（不经过模型）。 */
+const TOOL_IMPL = new Map();
+
 /** 待执行命令队列 + 正在等回执的 Promise。 */
+// ── 串口服务 ────────────────────────────────────────────────────────
+//
+// serialport 是 optionalDependency：装不上（或 ABI 不匹配）时插件照常启动，
+// 只是串口类工具返回明确的「驱动不可用」，不会把整个插件拖垮。
+//
+// 帧格式（下发 DSL 用）：
+//   'AIPI' | ver(1) | type(1) | len(u32 LE) | payload(UTF-8 JSON) | checksum(u16 LE, 字节和)
+let serialModule = null;
+let serialPort = null;
+let serialPath = '';
+
+async function loadSerial() {
+    if (serialModule) return serialModule;
+    const mod = await import('serialport');
+    serialModule = mod.default || mod;
+    return serialModule;
+}
+
+/** 字节和校验（简单、可复现；真机协议定了再换 CRC）。 */
+export function sum16(buf) {
+    let s = 0;
+    for (let i = 0; i < buf.length; i += 1) s = (s + buf[i]) & 0xffff;
+    return s;
+}
+
+/** 把 DSL 打成一帧。 */
+function frameDsl(dsl) {
+    const payload = Buffer.from(JSON.stringify(dsl), 'utf8');
+    const head = Buffer.alloc(10);
+    head.write('AIPI', 0, 'ascii');
+    head[4] = 1; // version
+    head[5] = 1; // type: DSL
+    head.writeUInt32LE(payload.length, 6);
+    const tail = Buffer.alloc(2);
+    tail.writeUInt16LE(sum16(payload), 0);
+    return Buffer.concat([head, payload, tail]);
+}
+
+/** 打开一个串口（同一时间只保留一个连接）。 */
+async function openSerial(path, baudRate) {
+    const { SerialPort } = await loadSerial();
+    if (serialPort) {
+        if (serialPath === path) return serialPort;
+        serialPort.close();
+        serialPort = null;
+    }
+    serialPort = await new Promise((resolveOpen, rejectOpen) => {
+        const p = new SerialPort({ path, baudRate: baudRate || 115200 }, (err) => {
+            if (err) rejectOpen(err);
+            else resolveOpen(p);
+        });
+    });
+    serialPath = path;
+    return serialPort;
+}
+
+/** 读一段时间的串口输出，返回文本。 */
+function readFor(portInstance, ms) {
+    return new Promise((resolveRead) => {
+        let text = '';
+        const onData = (chunk) => { text += chunk.toString('utf8'); };
+        portInstance.on('data', onData);
+        const timer = setTimeout(() => {
+            portInstance.removeListener('data', onData);
+            resolveRead(text);
+        }, ms);
+        if (typeof timer.unref === 'function') timer.unref();
+    });
+}
 const pending = [];
 const waiting = new Map();
 let seq = 0;
@@ -152,6 +224,17 @@ export function apply(ctx, config = {}) {
                     if (request.method !== 'POST') { json(response, 405, { ok: false }); return; }
                     const body = await readBody(request);
                     if (!body || !body.op) { json(response, 400, { ok: false, error: 'op 必填' }); return; }
+                    // tool:<name> 直接跑某个工具实现（本机自测，不经过模型）
+                    if (body.op.indexOf('tool:') === 0) {
+                        const fn = TOOL_IMPL.get(body.op.slice(5));
+                        if (!fn) { json(response, 404, { ok: false, error: '没有这个工具' }); return; }
+                        try {
+                            json(response, 200, { ok: true, data: await fn(body.args || {}) });
+                        } catch (error) {
+                            json(response, 200, { ok: false, error: String((error && error.message) || error) });
+                        }
+                        return;
+                    }
                     json(response, 200, await enqueue(body.op, body.args || {}));
                 }, 'aipi-workbench: agent dev');
             });
@@ -348,6 +431,116 @@ export function apply(ctx, config = {}) {
                 const r = await enqueue('import_state', { project: raw, name: target });
                 if (!r.ok) return pack('载入失败：' + (r.error || '未知错误'), { error: r.error });
                 return pack('已载入 ' + target, r.data || {});
+            },
+        });
+
+        // ── 串口工具 ──────────────────────────────────────────────
+        const mount = (def) => {
+            TOOL_IMPL.set(def.name, def.execute);
+            ctx.tools.register(def);
+        };
+
+        mount({
+            name: 'workbench_serial_ports',
+            description: '列出宿主上可用的串口（COM 口）。驱动未安装或加载失败时返回明确原因。',
+            parameters: { type: 'object', properties: {}, additionalProperties: false },
+            output: OUTPUT,
+            execute: async () => {
+                try {
+                    const { SerialPort } = await loadSerial();
+                    const list = await SerialPort.list();
+                    return pack('串口：' + list.length + ' 个', { ports: list });
+                } catch (error) {
+                    return pack('串口驱动不可用：' + error.message, { ports: [], error: String(error.message || error) });
+                }
+            },
+        });
+
+        mount({
+            name: 'workbench_push',
+            description: '编译当前工作台并下发：把 DSL 打成 AIPI 帧写到串口，然后读回一段时间的输出（self-test）。'
+                + 'dry=true 或省略 path 时只做打包预览，不打开串口。',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: '串口路径，如 COM5' },
+                    baudRate: { type: 'number', description: '波特率，默认 115200' },
+                    readMs: { type: 'number', description: '下发后读回时长（毫秒），默认 1500' },
+                    dry: { type: 'boolean', description: 'true = 只打包不发送' },
+                },
+                additionalProperties: false,
+            },
+            output: OUTPUT,
+            execute: async (args) => {
+                const a = args || {};
+                const r = await enqueue('compile');
+                if (!r.ok) return pack('编译失败：' + (r.error || '未知错误'), { error: r.error });
+                const dsl = (r.data && r.data.dsl) || {};
+                const frame = frameDsl(dsl);
+                const hexHead = frame.subarray(0, Math.min(24, frame.length)).toString('hex');
+                if (a.dry || !a.path) {
+                    return pack('打包完成（未发送）：' + frame.length + ' 字节', {
+                        bytes: frame.length,
+                        hexHead,
+                        rules: (dsl.rules || []).length,
+                        channels: (dsl.channels || []).length,
+                        checksum: sum16(frame.subarray(10, frame.length - 2)),
+                        dry: true,
+                    });
+                }
+                try {
+                    const port = await openSerial(a.path, a.baudRate);
+                    const readP = readFor(port, a.readMs || 1500);
+                    await new Promise((res, rej) => { port.write(frame, (err) => (err ? rej(err) : res())); });
+                    await new Promise((res) => port.drain(() => res()));
+                    const received = await readP;
+                    return pack('已下发 ' + frame.length + ' 字节到 ' + a.path + '，读回 ' + received.length + ' 字符', {
+                        path: a.path, bytes: frame.length, hexHead, received: received.slice(0, 2000),
+                    });
+                } catch (error) {
+                    return pack('下发失败：' + error.message, { path: a.path, error: String(error.message || error) });
+                }
+            },
+        });
+
+        mount({
+            name: 'workbench_serial_read',
+            description: '打开串口并读取指定时长（默认 1000ms）的输出，用来抓 self-test 日志。',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: '串口路径，如 COM5' },
+                    baudRate: { type: 'number', description: '波特率，默认 115200' },
+                    ms: { type: 'number', description: '读取时长，默认 1000' },
+                },
+                required: ['path'],
+                additionalProperties: false,
+            },
+            output: OUTPUT,
+            execute: async (args) => {
+                const a = args || {};
+                try {
+                    const port = await openSerial(a.path, a.baudRate);
+                    const text = await readFor(port, a.ms || 1000);
+                    return pack('读回 ' + text.length + ' 字符', { path: a.path, text: text.slice(0, 4000) });
+                } catch (error) {
+                    return pack('读取失败：' + error.message, { path: a.path, error: String(error.message || error) });
+                }
+            },
+        });
+
+        mount({
+            name: 'workbench_serial_close',
+            description: '关闭当前打开的串口。',
+            parameters: { type: 'object', properties: {}, additionalProperties: false },
+            output: OUTPUT,
+            execute: async () => {
+                if (!serialPort) return pack('没有打开的串口', { closed: false });
+                const path = serialPath;
+                try { await new Promise((res) => serialPort.close(() => res())); } catch { /* 关掉就行 */ }
+                serialPort = null;
+                serialPath = '';
+                return pack('已关闭 ' + path, { closed: true, path });
             },
         });
     } catch (error) {
