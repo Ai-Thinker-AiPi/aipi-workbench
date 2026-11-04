@@ -1,7 +1,7 @@
 # 第三方 bundle 的标准写法：顶层 `- insert:` 后接**列表**，新建一条 loader 行。
 # 带 id 但不带 insert 的顶层条目是「覆盖已有行」，基座里没有这个 id 时会报 patch target not found。
 - insert:
-    - id: aipi-idea-workbench
-      name: aipi-idea-workbench
+    - id: aipi-workbench
+      name: aipi-workbench
       config:
         enabled: true

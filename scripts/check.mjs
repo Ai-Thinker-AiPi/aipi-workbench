@@ -29,7 +29,7 @@ vm.runInContext(src, sandbox, { filename: 'client.js' });
 const fail = (msg) => { console.error('✗ ' + msg); process.exit(1); };
 
 if (!loaded) fail('没有调用 window.__ModuleLoader__.load');
-if (loaded.id !== 'aipi-idea-workbench') fail('bundle id 不对：' + loaded.id);
+if (loaded.id !== 'aipi-workbench') fail('bundle id 不对：' + loaded.id);
 if (typeof loaded.factory !== 'function') fail('factory 不是函数');
 
 const React = {
@@ -79,6 +79,12 @@ seats.forEach((s) => {
     if (typeof s.comp !== 'function') fail(s.seat.name + ' 的组件不是函数');
 });
 
+// 导轨名是产品名，改名时这里会先失败，避免只改了文档、界面还是旧名
+const rail = byName('sidebar.panellist')[0];
+if (typeof rail.seat.label !== 'function') fail('sidebar.panellist 没有 label 函数');
+const railLabel = rail.seat.label();
+if (railLabel !== '小安派工作台') fail('导轨名不对：' + railLabel);
+
 Array.from(new Set(disposers)).forEach((d) => d());
 if (freed.length !== seats.length) {
     fail('disposer 没有把座位都释放掉（注册 ' + seats.length + '，释放 ' + freed.length + '）');
@@ -86,6 +92,7 @@ if (freed.length !== seats.length) {
 
 console.log('✓ 装配检查通过：');
 console.log('  bundle id      ' + loaded.id);
+console.log('  导轨名         ' + railLabel);
 console.log('  inject         ' + JSON.stringify(mod.inject));
 console.log('  座位           ' + seats.map((s) => s.seat.name).join(' / '));
 console.log('  disposer       已释放 ' + freed.length + ' 个座位');

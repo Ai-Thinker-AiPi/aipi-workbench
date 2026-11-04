@@ -1,5 +1,6 @@
 /**
- * 小安派创意工作台 · 宿主半边（Host half）
+ * 小安派工作台 · 宿主半边（Host half）
+ * AiPi Workbench — DSH plugin, host half
  *
  * 这个插件的界面全部在 lib/client.js（浏览器半边），宿主这半边现在只做两件事：
  *   1. 让 loader 行有一个合法的入口模块（没有 apply 的模块会让整行加载失败）；
@@ -14,7 +15,7 @@
  */
 
 /** 插件名，cordis 用它做主键之一。 */
-export const name = 'aipi-idea-workbench';
+export const name = 'aipi-workbench';
 
 /**
  * 装配入口。
@@ -29,7 +30,7 @@ export const name = 'aipi-idea-workbench';
 export function apply(ctx, config = {}) {
     try {
         ctx?.logger?.info?.(
-            `aipi-idea-workbench: 已装配（enabled=${config.enabled !== false}）`,
+            `aipi-workbench: 已装配（enabled=${config.enabled !== false}）`,
         );
     } catch {
         /* 日志失败不影响装配 */
