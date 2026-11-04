@@ -79,6 +79,15 @@ dsh web
 
 **自动保存**：改动后 900ms 落盘。有文件句柄（走过一次「保存」）就写回原文件；没有句柄则写 `localStorage`，下次打开自动恢复并提示。
 
+## 多语言
+
+界面语言**跟随 DSH**：读 `<html lang>`（DSH 切语言时会改它），用 `MutationObserver` 监听变化实时重渲染。
+
+- 词表在 `lib/client.js` 的 `STRINGS`（`zh` / `en`），`t('key', {n})` 取词
+- 插件目录自带英文名（`nameEn` / `descEn` / `catEn` / `authorEn`），`pl(p)` 按语言取
+- 目前覆盖：工具条、插件库与分类、画布节点/主机接口文案、属性面板、主要提示与 toast；
+  校验清单和少数长提示仍是中文，后续补
+
 ## 开发
 
 客户端 `lib/client.js` 是**手写 bundle**：没有 `import`/`export`、没有 JSX、没有构建步骤。整份文件包在
