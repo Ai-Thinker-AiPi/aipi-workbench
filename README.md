@@ -62,6 +62,23 @@ dsh plugin --profile web add "D:\Users\Seahi\Desktop\项目文档\下一代开�
 dsh web
 ```
 
+## 工程文件（`.aipi`）
+
+工具条左侧：**新建 / 打开 / 保存**，快捷键 `Ctrl+N` / `Ctrl+O` / `Ctrl+S`（`Ctrl+Shift+S` 另存为）。
+
+工程就是一份 JSON（`format: aipi-workbench-project`, `version: 1`）：
+
+```json
+{ "meta": { "name": "自动迎宾装置" },
+  "nodes": [{ "pluginId": "axk-radar", "x": 22, "y": 62, "rot": 0, "uart": 1, "side": "right" }],
+  "view": { "mode": "preview", "leftWidth": 232, "chatWidth": 404 },
+  "device": { "connected": false } }
+```
+
+连线**不单独存**——由每个插件的 `uart`（占用主机第几路）和 `side`（从哪个 Type-C 口出线）推导，避免两处真值打架。
+
+**自动保存**：改动后 900ms 落盘。有文件句柄（走过一次「保存」）就写回原文件；没有句柄则写 `localStorage`，下次打开自动恢复并提示。
+
 ## 开发
 
 客户端 `lib/client.js` 是**手写 bundle**：没有 `import`/`export`、没有 JSX、没有构建步骤。整份文件包在
