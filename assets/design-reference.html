@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小安派创意工作台 · 原型</title>
+<style>
+  :root{
+    --bg:#eef1f5; --panel:#ffffff; --panel2:#f7f9fb; --line:#dce2ea;
+    --text:#1f2328; --muted:#6b7684; --accent:#2f6feb; --accent-soft:#e8f0ff;
+    --canvas:#fbfcfe; --grid:rgba(31,35,40,.06); --shadow:0 1px 3px rgba(16,24,40,.08);
+    --node:#fff; --node-line:#d7dee8; --ok:#1a7f37; --warn:#bf6a02; --err:#c92a2a;
+  }
+  [data-v="b"]{
+    --bg:#0f1216; --panel:#151a21; --panel2:#1a2029; --line:#28313d;
+    --text:#e6edf3; --muted:#8b98a9; --accent:#4ea1ff; --accent-soft:#12283f;
+    --canvas:#0b0e12; --grid:rgba(255,255,255,.05); --shadow:0 1px 3px rgba(0,0,0,.4);
+    --node:#171e27; --node-line:#2b3542; --ok:#3fb950; --warn:#d29922; --err:#f85149;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:13px/1.6 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+  /* ---------- 模拟的 DSH 外框 ---------- */
+  .dsh{display:flex;flex-direction:column;height:100vh}
+  .dsh-top{display:flex;align-items:center;gap:10px;height:38px;padding:0 12px;
+    background:var(--panel);border-bottom:1px solid var(--line);flex:none;font-size:12px;color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+  .dsh-top b{color:var(--text);font-weight:600}
+  .dsh-top .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .dsh-body{display:flex;flex:1;min-height:0}
+  .dsh-rail{width:52px;flex:none;background:var(--panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:10px}
+  .rail-btn{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;
+    color:var(--muted);font-size:15px}
+  .rail-btn.on{background:var(--accent-soft);color:var(--accent)}
+  .dsh-main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--panel2)}
+  body.no-shell .dsh-top,body.no-shell .dsh-rail{display:none}
+
+  /* ---------- 工作台三栏 ---------- */
+  .workbench{flex:1;display:grid;grid-template-columns:236px 1fr 268px;min-height:0}
+  .pane{min-width:0;display:flex;flex-direction:column;background:var(--panel)}
+  .pane.left{border-right:1px solid var(--line)}
+  .pane.right{border-left:1px solid var(--line)}
+  .pane-head{display:flex;align-items:center;gap:8px;padding:10px 12px 8px;flex:none}
+  .pane-head h3{margin:0;font-size:12px;font-weight:600;letter-spacing:.2px}
+  .pane-head .sub{margin-left:auto;color:var(--muted);font-size:11px}
+  .cats{display:flex;flex-wrap:wrap;gap:5px;padding:0 10px 8px;flex:none}
+  .cat{font-size:11px;padding:3px 8px;border-radius:20px;color:var(--muted);
+    border:1px solid transparent}
+  .cat.on{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+  .plist{overflow:auto;padding:2px 10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+  /* 主机：单独一栏置顶 */
+  .hostwrap{padding:0 10px 6px;flex:none}
+  .hostwrap .hh{font-size:10px;color:var(--muted);letter-spacing:.4px;margin:2px 2px 5px}
+  .pcard.host{display:flex;align-items:center;gap:9px;padding:7px}
+  .pcard.host .thumb{width:44px;height:44px;aspect-ratio:auto;flex:none;border-radius:8px}
+  .pcard.host .meta{min-width:0;flex:1}
+  .pcard.host .nm{text-align:left;margin:0;font-size:12px;font-weight:600}
+  .pcard.host .sm{font-size:10px;color:var(--muted);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .pcard{border:1px solid var(--line);border-radius:10px;background:var(--panel2);
+    padding:6px;cursor:grab;transition:.12s;user-select:none;position:relative}
+  .pcard:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--shadow)}
+  .pcard:active{cursor:grabbing}
+  .pcard .thumb{aspect-ratio:1/.86;border-radius:7px;display:grid;place-items:center;
+    background:#e8eef7;overflow:hidden}
+  [data-v="b"] .pcard .thumb{background:#1b2431}
+  .pcard .thumb svg{width:74%;height:74%}
+  .pcard .nm{margin-top:5px;font-size:11px;line-height:1.3;text-align:center;
+    color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pcard .tag{position:absolute;top:6px;right:6px;font-size:9px;color:var(--muted);
+    background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+
+  /* ---------- 中央工作区 ---------- */
+  .work{display:flex;flex-direction:column;min-width:0;background:var(--canvas)}
+  .wtool{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;flex:none;
+    border-bottom:1px solid var(--line);background:var(--panel)}
+  .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:2px}
+  .seg button{padding:4px 12px;border-radius:6px;font-size:12px;color:var(--muted)}
+  .seg button.on{background:var(--panel);color:var(--text);box-shadow:var(--shadow)}
+  .spacer{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);
+    border-radius:8px;padding:5px 11px;font-size:12px;background:var(--panel)}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{filter:brightness(1.06);color:#fff}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .conn{display:inline-flex;align-items:center;gap:6px}
+  .conn .led{width:7px;height:7px;border-radius:50%;background:#b9c2ce}
+  .conn.on .led{background:var(--ok);box-shadow:0 0 0 3px rgba(26,127,55,.15)}
+
+  .stage{position:relative;flex:1;overflow:auto}
+  .canvas{position:relative;min-height:100%;min-width:100%;
+    background-image:radial-gradient(var(--grid) 1px,transparent 1px);
+    background-size:16px 16px}
+  .empty{position:absolute;inset:0;display:grid;place-content:center;text-align:center;
+    color:var(--muted);font-size:12px;pointer-events:none;line-height:2}
+  .empty b{display:block;color:var(--text);font-size:13px;margin-bottom:2px}
+
+  .node{position:absolute;width:170px;background:var(--node);border:1px solid var(--node-line);
+    border-radius:10px;box-shadow:var(--shadow);user-select:none}
+  .node.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .node .nh{display:flex;align-items:center;gap:6px;padding:7px 9px;font-size:12px;font-weight:600;
+    border-bottom:1px solid var(--node-line);cursor:move}
+  .node .nh .ic{width:22px;height:22px;flex:none;display:grid;place-items:center;
+    border-radius:6px;background:var(--accent-soft);color:var(--accent)}
+  .node .nh .ic svg{width:15px;height:15px;display:block;stroke-width:4}
+  .node .nb{padding:7px 9px;font-size:11px;color:var(--muted)}
+  .node .nb .cap{display:block;margin:1px 0;color:var(--text);font-size:11px}
+  .port{position:absolute;top:50%;width:10px;height:10px;border-radius:50%;
+    background:var(--panel);border:2px solid var(--node-line);transform:translateY(-50%);z-index:2}
+  .port.in{left:-6px;border-color:#9aa8b8}
+  .port.out{right:-6px;border-color:var(--accent);cursor:crosshair}
+  .port:hover{background:var(--accent);border-color:var(--accent)}
+  .wires{position:absolute;inset:0;overflow:visible;pointer-events:none}
+  .wire{fill:none;stroke:var(--accent);stroke-width:2;opacity:.75;pointer-events:stroke;cursor:pointer}
+  .wire:hover{opacity:1;stroke-width:3}
+  .wire-tmp{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:4 4;opacity:.6}
+
+  /* ---------- 代码视图 ---------- */
+  .codewrap{display:none;flex:1;overflow:auto;padding:14px 16px;background:var(--canvas)}
+  .work.code .stage{display:none}
+  .work.code .codewrap{display:block}
+  .codewrap pre{margin:0 0 12px;background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:12px 14px;font:12px/1.7 "Cascadia Mono",Consolas,monospace;
+    color:var(--text);overflow:auto}
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:10px 14px;font-size:12px}
+  .rules h4{margin:0 0 6px;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.4px}
+  .rule{display:flex;gap:8px;padding:2px 0}
+  .rule .k{width:14px;text-align:center}
+  .rule.ok .k{color:var(--ok)} .rule.bad .k{color:var(--err)} .rule.skip .k{color:var(--muted)}
+
+  /* ---------- 右侧属性 ---------- */
+  .insp{overflow:auto;padding:12px;flex:1}
+  .insp .em{color:var(--muted);font-size:12px;line-height:2;padding-top:20px}
+  .field{margin-bottom:12px}
+  .field .lbl{font-size:11px;color:var(--muted);margin-bottom:3px}
+  .field .val{font-size:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+  .chip{font-size:11px;padding:2px 7px;border-radius:5px;background:var(--accent-soft);color:var(--accent)}
+  .price{display:flex;align-items:baseline;gap:6px}
+  .price b{font-size:16px;color:var(--text)}
+  .buy{display:block;text-align:center;margin-top:6px;padding:7px;border-radius:8px;
+    background:var(--accent);color:#fff;font-size:12px;text-decoration:none}
+  .divider{height:1px;background:var(--line);margin:12px 0}
+
+  /* ---------- 变体条 ---------- */
+  .vb{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;
+    display:flex;align-items:center;gap:6px;background:rgba(20,24,30,.92);color:#fff;
+    border-radius:999px;padding:6px 8px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:12px}
+  .vb span{opacity:.6;padding:0 6px}
+  .vb button{padding:4px 12px;border-radius:999px;color:#cfd8e3}
+  .vb button.on{background:#fff;color:#12161c;font-weight:600}
+  .vb .sep{width:1px;height:14px;background:rgba(255,255,255,.2);margin:0 4px}
+
+  .toast{position:fixed;right:18px;bottom:70px;z-index:70;background:var(--panel);
+    border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;
+    padding:10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:12px;
+    display:none;max-width:300px}
+  .toast.show{display:block}
+  .pop{position:absolute;top:44px;right:12px;z-index:50;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.15);
+    padding:12px 14px;width:250px;font-size:12px;display:none}
+  .pop.show{display:block}
+  .pop h4{margin:0 0 6px;font-size:12px}
+  .pop p{margin:4px 0;color:var(--muted);line-height:1.7}
+  .pop a{color:var(--accent);text-decoration:none}
+
+  /* ---------- C 变体：步骤化 ---------- */
+  [data-v="c"] .workbench{grid-template-columns:236px 1fr 268px}
+  [data-v="c"] .pcard{border-radius:14px}
+  [data-v="c"] .wtool{height:52px;gap:12px}
+  [data-v="c"] .steps{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);
+    padding:0 12px;height:30px;border-bottom:1px dashed var(--line);flex:none}
+  [data-v="c"] .steps b{color:var(--accent);font-weight:600}
+  [data-v="c"] .node{border-radius:14px}
+  .steps{display:none}
+</style>
+</head>
+<body data-v="a">
+
+<div class="dsh">
+  <div class="dsh-top">
+    <span class="dot"></span>
+    <b>DeepSeek Harness</b>
+    <span>· 会话「做一个自动迎宾装置」</span>
+    <div class="right">
+      <span>模型 deepseek-v4</span>
+      <span>·</span>
+      <span>插件 <b style="font-weight:600">小安派创意工作台</b></span>
+    </div>
+  </div>
+
+  <div class="dsh-body">
+    <div class="dsh-rail">
+      <div class="rail-btn">💬</div>
+      <div class="rail-btn">🗂</div>
+      <div class="rail-btn on">🧩</div>
+      <div class="rail-btn">⚙️</div>
+    </div>
+
+    <div class="dsh-main">
+      <div class="steps" id="steps">
+        <span>① 选硬件</span>›<span>② 拖进画布连线</span>›<span>③ 看预览</span>›<span>④ 切代码</span>›<span>⑤ 下发</span>
+      </div>
+
+      <div class="workbench" id="wb">
+        <!-- 左：硬件插件库 -->
+        <div class="pane left">
+          <div class="pane-head">
+            <h3>硬件插件</h3>
+            <span class="sub" id="cnt"></span>
+          </div>
+          <div class="hostwrap" id="hostwrap"></div>
+          <div class="cats" id="cats"></div>
+          <div class="plist" id="plist"></div>
+        </div>
+
+        <!-- 中：工作区 -->
+        <div class="work" id="work">
+          <div class="wtool">
+            <div class="seg" id="seg">
+              <button data-mode="preview" class="on">预览</button>
+              <button data-mode="code">代码</button>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn conn" id="connBtn"><span class="led"></span><span id="connTxt">连接设备</span></button>
+            <button class="btn" id="helpBtn">支持</button>
+            <button class="btn primary" id="pushBtn" disabled>下发到设备</button>
+            <div class="pop" id="pop">
+              <h4>支持</h4>
+              <p>· 插件没识别到？检查底板是否插入、串口是否被占用。</p>
+              <p>· 下发失败会回读 self-test，给出"逻辑错 / 物理错"归因。</p>
+              <p>· <a href="#">查看文档</a> · <a href="#">反馈问题</a></p>
+            </div>
+          </div>
+
+          <div class="stage" id="stage">
+            <div class="canvas" id="canvas">
+              <svg class="wires" id="wires"></svg>
+              <div class="empty" id="empty">
+                <b>把左边的硬件插件拖进来</b>
+                拖入后，从右侧圆点拉线到另一个插件即可连接<br>
+                连好后切到「代码」看生成的逻辑
+              </div>
+            </div>
+          </div>
+
+          <div class="codewrap" id="codewrap">
+            <pre id="codeOut"></pre>
+            <div class="rules">
+              <h4>静态校验</h4>
+              <div id="ruleList"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右：属性 -->
+        <div class="pane right">
+          <div class="pane-head"><h3>属性</h3></div>
+          <div class="insp" id="insp">
+            <div class="em">选中画布里的插件<br>可以看作者与购买方式</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="vb">
+  <span>变体</span>
+  <button data-v="a" class="on">A 经典三栏</button>
+  <button data-v="b">B 深色画布</button>
+  <button data-v="c">C 步骤化</button>
+  <div class="sep"></div>
+  <button id="shellBtn">隐藏 DSH 外框</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- 数据（与 06_工程资产/v0/data/registry.json 同源） ----------
+  const ICON = {
+    radar: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="24" cy="24" r="15" opacity=".25"/><circle cx="24" cy="24" r="9" opacity=".45"/><circle cx="24" cy="24" r="3" fill="currentColor" stroke="none"/><path d="M24 24 L36 15"/></svg>',
+    light: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M24 9a10 10 0 0 0-6 18v4h12v-4a10 10 0 0 0-6-18z"/><path d="M18 36h12M20 41h8"/></svg>',
+    voice: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="19" y="10" width="10" height="18" rx="5"/><path d="M14 24a10 10 0 0 0 20 0M24 34v6M19 40h10"/></svg>',
+    temp: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M28 12a5 5 0 0 0-10 0v16a8 8 0 1 0 10 0z"/><path d="M23 20v10"/></svg>',
+    light2: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="24" cy="24" r="7"/><path d="M24 8v5M24 35v5M8 24h5M35 24h5M13 13l3.5 3.5M31.5 31.5L35 35M35 13l-3.5 3.5M16.5 31.5L13 35"/></svg>',
+    servo: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="12" y="17" width="24" height="17" rx="3"/><path d="M24 17v-4M24 13h9"/><circle cx="24" cy="26" r="4.5"/></svg>',
+    motor: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="24" cy="24" r="11"/><path d="M24 13v6M24 29v6M13 24h6M29 24h6"/><circle cx="24" cy="24" r="3" fill="currentColor" stroke="none"/></svg>',
+    relay: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="11" y="15" width="26" height="18" rx="2"/><path d="M17 33v5M24 33v5M31 33v5M18 21h12"/></svg>',
+    screen: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="10" y="12" width="28" height="19" rx="2"/><path d="M18 36h12M24 31v5"/></svg>',
+    humi: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M24 10c6 8 10 12 10 17a10 10 0 0 1-20 0c0-5 4-9 10-17z"/></svg>',
+    hub: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="7" y="12" width="34" height="24" rx="4"/><rect x="18" y="19" width="12" height="10" rx="2"/><path d="M13 12V8M31 12V8M13 36v4M31 36v4M7 20h-3M7 28h-3M44 20h-3M44 28h-3"/></svg>'
+  };
+
+  // category / capability / 作者 / 购买
+  const CATALOG = [
+    { id:'aipi-hub', name:'AiPi-NodeMCU-Hub', cat:'主机', icon:'hub', cap:'hub.runtime', capType:'host',
+      io:{out:[], in:[]}, author:'安信可官方', price:'¥99', sku:'BL618DG 核心板',
+      iface:'4 × UART · USB 2.0 HS · WiFi6',
+      desc:'逻辑执行中枢。插件都插在它上面，逻辑与算法在本地芯片跑。' },
+    { id:'axk-radar', name:'雷达模组', cat:'传感器', icon:'radar', cap:'radar.person_detect', capType:'sensor',
+      io:{out:['person_enter','person_leave'], in:[]}, author:'安信可官方', price:'¥29', sku:'AiPi-Radar-24G',
+      desc:'24GHz 人体感应，输出靠近/离开事件与距离。' },
+    { id:'axk-temp', name:'温湿度模组', cat:'传感器', icon:'temp', cap:'sensor.read_temp', capType:'sensor',
+      io:{out:['temp_change'], in:[]}, author:'安信可官方', price:'¥19', sku:'AiPi-TH-01',
+      desc:'温度 ±0.3℃，湿度 ±3%RH，周期上报。' },
+    { id:'axk-light', name:'灯 / 继电器', cat:'控制类', icon:'light', cap:'light.set', capType:'actuator',
+      io:{out:[], in:['on']}, author:'安信可官方', price:'¥25', sku:'AiPi-Light-01',
+      desc:'单路继电器，支持开/关与亮度扩展。' },
+    { id:'axk-relay4', name:'四路继电器', cat:'控制类', icon:'relay', cap:'relay.set', capType:'actuator',
+      io:{out:[], in:['ch','on']}, author:'社区 · 阿树', price:'¥59', sku:'AS-Relay4',
+      desc:'四路独立控制，适合多设备场景。' },
+    { id:'axk-screen', name:'1.3" 屏幕', cat:'控制类', icon:'screen', cap:'screen.show', capType:'interaction',
+      io:{out:[], in:['text']}, author:'社区 · 林', price:'¥45', sku:'AS-LCD13',
+      desc:'显示文字与简单表情。' },
+    { id:'axk-servo', name:'舵机', cat:'电机类', icon:'servo', cap:'servo.set_angle', capType:'actuator',
+      io:{out:[], in:['angle']}, author:'安信可官方', price:'¥22', sku:'AiPi-Servo-9G',
+      desc:'0–180° 角度控制，PWM 驱动。' },
+    { id:'axk-motor', name:'直流电机', cat:'电机类', icon:'motor', cap:'motor.run', capType:'actuator',
+      io:{out:[], in:['speed','dir']}, author:'社区 · 阿树', price:'¥35', sku:'AS-Motor-130',
+      desc:'调速 + 正反转，带编码器版本可选。' },
+    { id:'axk-wv01-32s', name:'Ai-WV01-32S 语音', cat:'AI语音', icon:'voice', cap:'speech.ask_llm', capType:'interaction',
+      io:{out:[], in:['prompt']}, author:'安信可官方', price:'¥69', sku:'Ai-WV01-32S',
+      desc:'离线唤醒 + 云端 TTS，说一句即可。' }
+  ];
+
+  const CATS = ['全部','传感器','控制类','电机类','AI语音'];
+  const $ = (s, r = document) => r.querySelector(s);
+  const el = (t, cls) => { const n = document.createElement(t); if (cls) n.className = cls; return n; };
+
+  // ---------- 状态 ----------
+  const S = {
+    filter: '全部',
+    nodes: [],          // {uid, id, x, y}
+    wires: [],          // {from, to}
+    sel: null,          // uid
+    connected: false,
+    uid: 0
+  };
+  const byId = id => CATALOG.find(p => p.id === id);
+  // 给 SVG 补显式宽高，不依赖外部 CSS 也能正确缩放到指定尺寸
+  const iconSvg = (k, size) =>
+    (ICON[k] || '').replace('<svg ', `<svg width="${size}" height="${size}" `);
+
+  // ---------- 左侧插件库 ----------
+  function renderCats() {
+    const box = $('#cats'); box.innerHTML = '';
+    CATS.forEach(c => {
+      const b = el('button', 'cat' + (c === S.filter ? ' on' : ''));
+      b.textContent = c;
+      b.onclick = () => { S.filter = c; renderCats(); renderList(); };
+      box.appendChild(b);
+    });
+  }
+  function makeCard(p, isHost) {
+    const c = el('div', 'pcard' + (isHost ? ' host' : ''));
+    c.draggable = true;
+    c.dataset.id = p.id;
+    c.innerHTML = isHost
+      ? `<div class="thumb">${iconSvg(p.icon, 30)}</div>
+         <div class="meta">
+           <div class="nm" title="${p.name}">${p.name}</div>
+           <div class="sm">${p.iface}</div>
+         </div>`
+      : `<div class="tag">${p.cat}</div>
+         <div class="thumb">${ICON[p.icon] || ICON.relay}</div>
+         <div class="nm" title="${p.name}">${p.name}</div>`;
+    c.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', p.id);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    c.addEventListener('click', () => addNode(p.id, 70 + Math.random() * 110, 70 + Math.random() * 110));
+    return c;
+  }
+
+  function renderHost() {
+    const box = $('#hostwrap'); box.innerHTML = '';
+    const label = el('div', 'hh'); label.textContent = '主机 · 底座';
+    box.appendChild(label);
+    CATALOG.filter(p => p.cat === '主机').forEach(p => box.appendChild(makeCard(p, true)));
+  }
+
+  function renderList() {
+    const box = $('#plist'); box.innerHTML = '';
+    const list = CATALOG.filter(p => p.cat !== '主机')
+      .filter(p => S.filter === '全部' || p.cat === S.filter);
+    $('#cnt').textContent = list.length + ' 个';
+    list.forEach(p => box.appendChild(makeCard(p, false)));
+  }
+
+  // ---------- 画布 ----------
+  const stage = $('#stage'), canvas = $('#canvas'), wiresSvg = $('#wires');
+
+  function addNode(id, x, y) {
+    const p = byId(id); if (!p) return;
+    if (p.cat === '主机' && S.nodes.some(n => byId(n.id).capType === 'host')) {
+      toast('画布上已经有主机了'); return;
+    }
+    const node = { uid: 'n' + (++S.uid), id, x: Math.max(8, x), y: Math.max(8, y) };
+    S.nodes.push(node);
+    renderNodes(); select(node.uid); syncEmpty();
+    return node;
+  }
+
+  function renderNodes() {
+    [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+    S.nodes.forEach(n => canvas.appendChild(nodeEl(n)));
+    drawWires();
+  }
+
+  function nodeEl(n) {
+    const p = byId(n.id);
+    const d = el('div', 'node' + (S.sel === n.uid ? ' sel' : ''));
+    d.style.left = n.x + 'px'; d.style.top = n.y + 'px';
+    d.dataset.uid = n.uid;
+    d.innerHTML = `
+      <div class="nh"><span class="ic">${iconSvg(p.icon, 15)}</span>${p.name}</div>
+      <div class="nb">
+        <span class="cap">${p.capType === 'host' ? '4 × UART · USB 2.0' : p.cap}</span>
+        <span>${p.capType === 'host' ? '逻辑执行中枢' : p.capType}</span>
+      </div>`;
+    if (p.io.in.length) d.appendChild(Object.assign(el('div', 'port in'), {}))
+    const pin = d.querySelector('.port.in'); if (pin) pin.dataset.uid = n.uid;
+    const pout = el('div', 'port out'); pout.dataset.uid = n.uid; d.appendChild(pout);
+
+    // 选中
+    d.addEventListener('pointerdown', e => {
+      if (e.target.classList.contains('port')) return;
+      select(n.uid);
+      const sx = e.clientX, sy = e.clientY, ox = n.x, oy = n.y;
+      const move = ev => {
+        n.x = ox + (ev.clientX - sx); n.y = oy + (ev.clientY - sy);
+        d.style.left = n.x + 'px'; d.style.top = n.y + 'px'; drawWires();
+      };
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    });
+
+    // 拉线
+    pout.addEventListener('pointerdown', e => {
+      e.stopPropagation(); e.preventDefault();
+      startWire(n.uid, e.clientX, e.clientY, e.target);
+    });
+
+    return d;
+  }
+
+  let wiring = null;
+  function startWire(fromUid, x, y, portEl) {
+    wiring = { from: fromUid };
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tmp.setAttribute('class', 'wire-tmp');
+    wiresSvg.appendChild(tmp);
+    const rect = canvas.getBoundingClientRect();
+    const move = ev => {
+      const a = portPos(fromUid); if (!a) return;
+      tmp.setAttribute('d', bez(a.x, a.y, ev.clientX - rect.left, ev.clientY - rect.top));
+    };
+    const up = ev => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      tmp.remove();
+      const t = document.elementFromPoint(ev.clientX, ev.clientY);
+      const target = t && t.classList && t.classList.contains('in') ? t.dataset.uid : null;
+      if (target && target !== fromUid) {
+        if (!S.wires.some(w => w.from === fromUid && w.to === target)) S.wires.push({ from: fromUid, to: target });
+        drawWires(); renderCode(); toast('已连接');
+      }
+      wiring = null;
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  }
+
+  function portPos(uid) {
+    const n = S.nodes.find(x => x.uid === uid); if (!n) return null;
+    const d = canvas.querySelector(`.node[data-uid="${uid}"] .port.out`); if (!d) return null;
+    const r = d.getBoundingClientRect(), c = canvas.getBoundingClientRect();
+    return { x: r.left + r.width / 2 - c.left, y: r.top + r.height / 2 - c.top };
+  }
+  function inPos(uid) {
+    const d = canvas.querySelector(`.node[data-uid="${uid}"] .port.in`); if (!d) return null;
+    const r = d.getBoundingClientRect(), c = canvas.getBoundingClientRect();
+    return { x: r.left + r.width / 2 - c.left, y: r.top + r.height / 2 - c.top };
+  }
+  const bez = (x1, y1, x2, y2) => {
+    const dx = Math.max(30, Math.abs(x2 - x1) * 0.45);
+    return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
+  };
+
+  function drawWires() {
+    [...wiresSvg.querySelectorAll('.wire')].forEach(w => w.remove());
+    S.wires.forEach((w, i) => {
+      const a = portPos(w.from), b = inPos(w.to); if (!a || !b) return;
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('class', 'wire'); p.setAttribute('d', bez(a.x, a.y, b.x, b.y));
+      p.onclick = () => { S.wires.splice(i, 1); drawWires(); renderCode(); };
+      wiresSvg.appendChild(p);
+    });
+  }
+
+  function syncEmpty() { $('#empty').style.display = S.nodes.length ? 'none' : 'grid'; }
+
+  // ---------- 属性面板 ----------
+  function select(uid) {
+    S.sel = uid;
+    [...canvas.querySelectorAll('.node')].forEach(n =>
+      n.classList.toggle('sel', n.dataset.uid === uid));
+    renderInsp();
+  }
+
+  function renderInsp() {
+    const box = $('#insp');
+    const n = S.nodes.find(x => x.uid === S.sel);
+    if (!n) { box.innerHTML = '<div class="em">选中画布里的插件<br>可以看作者与购买方式</div>'; return; }
+    const p = byId(n.id);
+    box.innerHTML = `
+      <div class="field" style="display:flex;gap:10px;align-items:center">
+        <span style="width:38px;height:38px;flex:none;border-radius:9px;display:grid;place-items:center;
+          background:var(--accent-soft);color:var(--accent)">${iconSvg(p.icon, 24)}</span>
+        <div style="min-width:0">
+          <div class="val"><b>${p.name}</b></div>
+          <div style="color:var(--muted);font-size:11px">${p.id}</div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="lbl">分类</div><div class="val">${p.cat}</div>
+      </div>
+      <div class="field">
+        <div class="lbl">说明</div><div class="val" style="color:var(--muted)">${p.desc}</div>
+      </div>
+      ${p.iface ? `<div class="field"><div class="lbl">接口</div><div class="val">${p.iface}</div></div>` : ''}
+      <div class="divider"></div>
+      <div class="field">
+        <div class="lbl">作者</div><div class="val">${p.author}</div>
+      </div>
+      ${p.capType === 'host' ? '' : `
+      <div class="field">
+        <div class="lbl">能力</div>
+        <div class="chips"><span class="chip">${p.cap}</span><span class="chip">${p.capType}</span></div>
+      </div>
+      <div class="field">
+        <div class="lbl">${p.io.out.length ? '可上报事件' : '可下发参数'}</div>
+        <div class="chips">${(p.io.out.length ? p.io.out : p.io.in).map(x => `<span class="chip">${x}</span>`).join('')}</div>
+      </div>`}
+      <div class="divider"></div>
+      <div class="field">
+        <div class="lbl">购买方式</div>
+        <div class="price"><b>${p.price}</b><span style="color:var(--muted);font-size:11px">${p.sku}</span></div>
+        <a class="buy" href="#" onclick="return false;">去官方店铺购买</a>
+      </div>
+      <div class="field" style="margin-top:14px">
+        <button class="btn" id="delNode" style="width:100%;justify-content:center">从画布移除</button>
+      </div>`;
+    $('#delNode').onclick = () => {
+      S.nodes = S.nodes.filter(x => x.uid !== n.uid);
+      S.wires = S.wires.filter(w => w.from !== n.uid && w.to !== n.uid);
+      S.sel = null; renderNodes(); select(null); syncEmpty(); renderCode(); toast('已移除');
+    };
+  }
+
+  // ---------- 视图切换 ----------
+  $('#seg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    [...$('#seg').children].forEach(x => x.classList.toggle('on', x === b));
+    const mode = b.dataset.mode;
+    $('#work').classList.toggle('code', mode === 'code');
+    if (mode === 'code') renderCode();
+  });
+
+  // ---------- 生成代码 / 校验 ----------
+  function buildDSL() {
+    const ins = S.wires.map(w => ({
+      when: { plugin: byId(S.nodes.find(n => n.uid === w.from).id).cap, event: byId(S.nodes.find(n => n.uid === w.from).id).io.out[0] },
+      then: [{ [byId(S.nodes.find(n => n.uid === w.to).id).cap]: '…' }]
+    }));
+    return { version: '0.1', logic: ins };
+  }
+
+  function renderCode() {
+    const dsl = buildDSL();
+    $('#codeOut').textContent = JSON.stringify(dsl, null, 2);
+    const sensors = S.nodes.filter(n => byId(n.id).capType === 'sensor').length;
+    const actors = S.nodes.filter(n => ['actuator','interaction'].includes(byId(n.id).capType)).length;
+    const orphan = S.nodes.filter(n => ['actuator','interaction'].includes(byId(n.id).capType))
+      .filter(n => !S.wires.some(w => w.to === n.uid)).length;
+    const self = S.wires.some(w => w.from === w.to);
+    const rules = [
+      ['结构 schema', S.nodes.length > 0, S.nodes.length ? '通过' : '画布为空'],
+      ['能力存在性', S.nodes.every(n => !!byId(n.id)), '全部命中注册表'],
+      ['类型匹配', !S.wires.some(w => byId(S.nodes.find(n=>n.uid===w.from).id).capType !== 'sensor'), 'when 只挂 sensor'],
+      ['事件合法', true, '均在 behavior_model 事件集内'],
+      ['实例 / 通道', S.nodes.length <= 12, `插件 ${S.nodes.length}/12`],
+      ['无环', !self, self ? '存在自环' : '无自环'],
+      ['有执行出口', orphan === 0, orphan ? `${orphan} 个执行器未连接` : '全部已连接'],
+      ['至少一个传感器', sensors > 0, sensors ? `${sensors} 个` : '缺传感器']
+    ];
+    $('#ruleList').innerHTML = rules.map(([n, ok, note]) =>
+      `<div class="rule ${ok ? 'ok' : 'bad'}"><span class="k">${ok ? '✓' : '✗'}</span>
+        <span style="flex:1">${n}</span><span style="color:var(--muted)">${note}</span></div>`).join('');
+    $('#pushBtn').disabled = !(S.wires.length && orphan === 0);
+  }
+
+  // ---------- 设备连接 / 下发 ----------
+  $('#connBtn').onclick = () => {
+    const btn = $('#connBtn'), txt = $('#connTxt');
+    if (S.connected) {
+      S.connected = false; btn.classList.remove('on'); txt.textContent = '连接设备'; toast('已断开'); return;
+    }
+    btn.disabled = true; txt.textContent = '扫描中…';
+    setTimeout(() => {
+      btn.disabled = false; S.connected = true; btn.classList.add('on');
+      txt.textContent = '底板已连接';
+      toast('found: AiPi-NodeMCU-Hub · 枚举到 3 个插件');
+    }, 900);
+  };
+
+  $('#pushBtn').onclick = () => {
+    const b = $('#pushBtn'), old = b.textContent;
+    b.disabled = true;
+    [ '校验通过…', '编译字节码…', '下发中 40%…', '下发中 80%…', '回读 self-test…' ]
+      .reduce((p, t) => p.then(() => new Promise(r => { b.textContent = t; setTimeout(r, 520); })), Promise.resolve())
+      .then(() => { b.textContent = old; b.disabled = false; toast('下发成功 · 真机运行中（验证报告：预期 2/2 命中）'); });
+  };
+
+  $('#helpBtn').onclick = e => { e.stopPropagation(); $('#pop').classList.toggle('show'); };
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#pop') && !e.target.closest('#helpBtn')) $('#pop').classList.remove('show');
+  });
+
+  // ---------- 拖放 ----------
+  canvas.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  canvas.addEventListener('drop', e => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain'); if (!id) return;
+    const r = canvas.getBoundingClientRect();
+    addNode(id, e.clientX - r.left - 85, e.clientY - r.top - 26);
+  });
+
+  // ---------- toast ----------
+  let tt;
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  // ---------- 变体 ----------
+  const VARIANT = { a: '经典三栏', b: '深色画布', c: '步骤化' };
+  function setVariant(v, push) {
+    document.body.dataset.v = v;
+    [...document.querySelectorAll('.vb button[data-v]')].forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    if (push) history.replaceState(null, '', '?v=' + v);
+    drawWires();
+  }
+  document.querySelectorAll('.vb button[data-v]').forEach(b => {
+    b.onclick = () => setVariant(b.dataset.v, true);
+  });
+  $('#shellBtn').onclick = () => {
+    document.body.classList.toggle('no-shell');
+    $('#shellBtn').textContent = document.body.classList.contains('no-shell') ? '显示 DSH 外框' : '隐藏 DSH 外框';
+    requestAnimationFrame(drawWires);
+  };
+
+  // ---------- 启动 ----------
+  const q = new URLSearchParams(location.search).get('v');
+  setVariant(VARIANT[q] ? q : 'a', false);
+  renderCats(); renderHost(); renderList(); syncEmpty(); renderCode();
+  window.addEventListener('resize', drawWires);
+
+  // 预置：主机 + "人靠近→亮灯 + 语音" 示例，打开就能看到连好的样子
+  const h1 = addNode('aipi-hub', 400, 300);
+  const r1 = addNode('axk-radar', 70, 110);
+  const l1 = addNode('axk-light', 700, 90);
+  const v1 = addNode('axk-wv01-32s', 700, 230);
+  S.wires.push({ from: r1.uid, to: l1.uid }, { from: r1.uid, to: v1.uid });
+  renderNodes(); select(r1.uid); syncEmpty(); renderCode();
+})();
+</script>
+</body>
+</html>
