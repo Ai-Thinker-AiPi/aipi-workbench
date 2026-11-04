@@ -96,3 +96,39 @@ console.log('  导轨名         ' + railLabel);
 console.log('  inject         ' + JSON.stringify(mod.inject));
 console.log('  座位           ' + seats.map((s) => s.seat.name).join(' / '));
 console.log('  disposer       已释放 ' + freed.length + ' 个座位');
+
+// ── 宿主半边：工具与路由 ──────────────────────────────────────────────
+// index.js 是 ESM；这里把 export 关键字去掉后在 vm 里跑，验证：
+//   1. apply 不返回对象（返回对象会被 cordis 判为 Invalid effect）；
+//   2. 注册了 4 个工具、3 条路由。
+const hostSrc = readFileSync(join(here, '..', 'index.js'), 'utf8')
+    .replace(/export\s+const\s+/g, 'const ')
+    .replace(/export\s+function\s+/g, 'function ');
+
+const hostSandbox = { console, setTimeout, clearTimeout, Promise, JSON, Date, Array, Object, Number, String, Math, globalThis: null };
+hostSandbox.globalThis = hostSandbox;
+vm.createContext(hostSandbox);
+vm.runInContext(hostSrc + '\n;globalThis.__host = { name, inject, apply };', hostSandbox, { filename: 'index.js' });
+
+const host = hostSandbox.__host;
+const hostTools = [];
+const hostRoutes = [];
+const hostCtx = {
+    logger: { info: () => {}, warn: () => {} },
+    inject: (deps, cb) => cb({
+        webServer: { register: (opts) => { hostRoutes.push(opts.path); return () => {}; } },
+        effect: () => {},
+    }),
+    tools: { register: (t) => { hostTools.push(t.name); return () => {}; } },
+};
+const applied = host.apply(hostCtx);
+if (applied !== undefined) fail('宿主 apply 返回了 ' + typeof applied + '（会触发 Invalid effect）');
+if (host.inject.indexOf('tools') < 0) fail('宿主 inject 缺 tools');
+
+['workbench_state', 'workbench_add_plugin', 'workbench_remove_plugin', 'workbench_set_rules']
+    .forEach((n) => { if (hostTools.indexOf(n) < 0) fail('没注册工具：' + n); });
+['/aipi-workbench/agent/poll', '/aipi-workbench/agent/result', '/aipi-workbench/agent/dev']
+    .forEach((r) => { if (hostRoutes.indexOf(r) < 0) fail('没注册路由：' + r); });
+
+console.log('  宿主工具       ' + hostTools.join(' / '));
+console.log('  宿主路由       ' + hostRoutes.join(' / '));

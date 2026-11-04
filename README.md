@@ -126,3 +126,27 @@ npm run check   # 校验 bundle id、apply/inject、两个座位、导轨名、d
 ## 许可
 
 MIT
+
+## Agent 通道（让 DSH 直接操作工作台）
+
+宿主半边 `index.js` 把工作台暴露成工具，浏览器半边 `lib/client.js` 轮询执行：
+
+```
+Agent ──tool──▶ index.js ──队列──▶ GET /aipi-workbench/agent/poll
+                     ▲                        │
+                     └── POST /result ◀── 执行（React 状态）──┘
+```
+
+| 工具 | 作用 |
+|---|---|
+| `workbench_state` | 读画布：主机与插件、每路 UART 占用、规则、插件目录（可用 id + 事件/参数） |
+| `workbench_add_plugin` | 放一个插件到画布（自动找空闲 UART） |
+| `workbench_remove_plugin` | 移除插件并释放通道 |
+| `workbench_set_rules` | 整体替换逻辑规则（`uart/event/then[{uart,action,args}]`） |
+
+约束与坑：
+
+- **面板没打开时命令没人执行**：工具会等 12s 然后返回「工作台没有响应」，不会假装成功。
+- **只能有一个实例轮询**：工作台可能被挂载多份（侧栏预览 / 主画布），多个轮询者会把命令随机分到不同的状态副本（实测 `nodes` 在 3/4 之间跳）。现在只有可见实例能拿到通道（`window.__aipiAgentOwner`）。
+- 工具输出统一是 `{ summary, json }`：DSH 要求每个工具声明 `output.schema + render`，所以结构化数据放在 `json` 字符串里。
+- `/agent/dev` 是本机自测入口，和工具走同一条队列，方便用脚本验证整条链路。
