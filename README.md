@@ -150,3 +150,26 @@ Agent ──tool──▶ index.js ──队列──▶ GET /aipi-workbench/age
 - **只能有一个实例轮询**：工作台可能被挂载多份（侧栏预览 / 主画布），多个轮询者会把命令随机分到不同的状态副本（实测 `nodes` 在 3/4 之间跳）。现在只有可见实例能拿到通道（`window.__aipiAgentOwner`）。
 - 工具输出统一是 `{ summary, json }`：DSH 要求每个工具声明 `output.schema + render`，所以结构化数据放在 `json` 字符串里。
 - `/agent/dev` 是本机自测入口，和工具走同一条队列，方便用脚本验证整条链路。
+
+### 工具清单（9 个）
+
+| 工具 | 作用 |
+| --- | --- |
+| workbench_state | 读画布：主机与插件、每路 UART、规则、插件目录（可用 id + 事件/参数） |
+| workbench_add_plugin | 放一个插件到画布（自动找空闲 UART） |
+| workbench_remove_plugin | 移除插件并释放通道 |
+| workbench_set_rules | 整体替换逻辑规则 |
+| workbench_validate | 静态校验，返回 passed 与 issues |
+| workbench_compile | 编译成下发 DSL（channels + rules）并返回摘要 |
+| workbench_simulate | 只读仿真，返回按时间排序的执行步骤 |
+| workbench_save_project | 导出 .aipi 并写到宿主磁盘 |
+| workbench_open_project | 从宿主磁盘读 .aipi 并载入工作台 |
+
+一条最小闭环（Agent 视角）：
+
+1. workbench_state 看画布与目录
+2. workbench_add_plugin 摆上雷达与灯
+3. workbench_set_rules 写规则
+4. workbench_validate 校验通过
+5. workbench_compile 拿 DSL
+6. workbench_save_project 存盘

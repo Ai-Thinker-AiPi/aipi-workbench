@@ -102,10 +102,15 @@ console.log('  disposer       已释放 ' + freed.length + ' 个座位');
 //   1. apply 不返回对象（返回对象会被 cordis 判为 Invalid effect）；
 //   2. 注册了 4 个工具、3 条路由。
 const hostSrc = readFileSync(join(here, '..', 'index.js'), 'utf8')
+    .replace(/^import\s+.*$/gm, '')
     .replace(/export\s+const\s+/g, 'const ')
     .replace(/export\s+function\s+/g, 'function ');
 
-const hostSandbox = { console, setTimeout, clearTimeout, Promise, JSON, Date, Array, Object, Number, String, Math, globalThis: null };
+const hostSandbox = {
+    console, setTimeout, clearTimeout, Promise, JSON, Date, Array, Object, Number, String, Math, globalThis: null,
+    // index.js 里 import 的宿主能力；装配期用不到，给空壳即可
+    readFileSync: () => '', writeFileSync: () => {}, resolve: (p) => p, process: { cwd: () => '.' },
+};
 hostSandbox.globalThis = hostSandbox;
 vm.createContext(hostSandbox);
 vm.runInContext(hostSrc + '\n;globalThis.__host = { name, inject, apply };', hostSandbox, { filename: 'index.js' });
@@ -125,7 +130,8 @@ const applied = host.apply(hostCtx);
 if (applied !== undefined) fail('宿主 apply 返回了 ' + typeof applied + '（会触发 Invalid effect）');
 if (host.inject.indexOf('tools') < 0) fail('宿主 inject 缺 tools');
 
-['workbench_state', 'workbench_add_plugin', 'workbench_remove_plugin', 'workbench_set_rules']
+['workbench_state', 'workbench_add_plugin', 'workbench_remove_plugin', 'workbench_set_rules',
+    'workbench_validate', 'workbench_compile', 'workbench_simulate', 'workbench_save_project', 'workbench_open_project']
     .forEach((n) => { if (hostTools.indexOf(n) < 0) fail('没注册工具：' + n); });
 ['/aipi-workbench/agent/poll', '/aipi-workbench/agent/result', '/aipi-workbench/agent/dev']
     .forEach((r) => { if (hostRoutes.indexOf(r) < 0) fail('没注册路由：' + r); });

@@ -15,6 +15,9 @@
  *   · 本文件不碰 React 状态，只做转发与超时。
  */
 
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 /** 插件名，cordis 用它做主键之一。 */
 export const name = 'aipi-workbench';
 
@@ -253,6 +256,98 @@ export function apply(ctx, config = {}) {
                 const r = await enqueue('set_rules', args || {});
                 if (!r.ok) return pack('写入失败：' + (r.error || '未知错误'), { error: r.error });
                 return pack('已写入 ' + ((r.data && r.data.count) || 0) + ' 条规则', r.data || {});
+            },
+        });
+
+        ctx.tools.register({
+            name: 'workbench_validate',
+            description: '按当前画布与规则跑一遍静态校验：主机是否存在、插件是否都接到通道、规则引用的通道是否存在、以及内置的工程校验项。返回 passed 与 issues 列表。',
+            parameters: { type: 'object', properties: {}, additionalProperties: false },
+            output: OUTPUT,
+            execute: async () => {
+                const r = await enqueue('validate');
+                if (!r.ok) return pack('校验失败：' + (r.error || '未知错误'), { error: r.error });
+                const d = r.data || {};
+                const n = (d.issues || []).length;
+                return pack((d.passed ? '校验通过' : '校验未通过') + '（' + n + ' 条问题）', d);
+            },
+        });
+
+        ctx.tools.register({
+            name: 'workbench_compile',
+            description: '把当前工作台编译成下发用的 DSL（通道、插件、规则），返回 dsl 与规模摘要。编译不写盘、不下发。',
+            parameters: { type: 'object', properties: {}, additionalProperties: false },
+            output: OUTPUT,
+            execute: async () => {
+                const r = await enqueue('compile');
+                if (!r.ok) return pack('编译失败：' + (r.error || '未知错误'), { error: r.error });
+                const s = (r.data && r.data.summary) || {};
+                return pack('已编译：' + (s.nodes || 0) + ' 节点 / ' + (s.rules || 0) + ' 规则', r.data || {});
+            },
+        });
+
+        ctx.tools.register({
+            name: 'workbench_simulate',
+            description: '按当前规则跑一次只读仿真，返回按时间排序的执行步骤（谁触发、执行了什么）。不连硬件。',
+            parameters: { type: 'object', properties: {}, additionalProperties: false },
+            output: OUTPUT,
+            execute: async () => {
+                const r = await enqueue('simulate');
+                if (!r.ok) return pack('仿真失败：' + (r.error || '未知错误'), { error: r.error });
+                const steps = (r.data && r.data.steps) || [];
+                return pack('仿真：' + steps.length + ' 步', { steps });
+            },
+        });
+
+        ctx.tools.register({
+            name: 'workbench_save_project',
+            description: '把当前工作台导出成 .aipi 工程文件并写到宿主磁盘。path 省略时写到当前工作目录下 <工程名>.aipi。',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: '目标文件路径（绝对或相对宿主 cwd）' },
+                },
+                additionalProperties: false,
+            },
+            output: OUTPUT,
+            execute: async (args) => {
+                const r = await enqueue('export_state');
+                if (!r.ok) return pack('导出失败：' + (r.error || '未知错误'), { error: r.error });
+                const project = (r.data && r.data.project) || {};
+                const name = (project.meta && project.meta.name) || 'untitled';
+                const target = args && args.path ? resolve(args.path) : resolve(process.cwd(), name + '.aipi');
+                try {
+                    writeFileSync(target, JSON.stringify(project, null, 2), 'utf8');
+                } catch (error) {
+                    return pack('写盘失败：' + error.message, { path: target });
+                }
+                return pack('已保存到 ' + target, { path: target });
+            },
+        });
+
+        ctx.tools.register({
+            name: 'workbench_open_project',
+            description: '从宿主磁盘读一个 .aipi 工程并载入工作台（替换当前画布与规则）。',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: '工程文件路径（绝对或相对宿主 cwd）' },
+                },
+                required: ['path'],
+                additionalProperties: false,
+            },
+            output: OUTPUT,
+            execute: async (args) => {
+                const target = resolve((args && args.path) || '');
+                let raw;
+                try {
+                    raw = JSON.parse(readFileSync(target, 'utf8'));
+                } catch (error) {
+                    return pack('读取失败：' + error.message, { path: target });
+                }
+                const r = await enqueue('import_state', { project: raw, name: target });
+                if (!r.ok) return pack('载入失败：' + (r.error || '未知错误'), { error: r.error });
+                return pack('已载入 ' + target, r.data || {});
             },
         });
     } catch (error) {
