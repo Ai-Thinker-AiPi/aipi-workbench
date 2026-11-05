@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小安派工作台 · 上位机功能设计报告</title>
+<style>
+  :root {
+    --ink: #1b1f24;
+    --ink-2: #4b5563;
+    --line: #e3e6ea;
+    --bg-soft: #f6f7f9;
+    --accent: #2f6feb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto;
+    max-width: 980px;
+    padding: 48px 40px 64px;
+    font: 15px/1.75 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    color: var(--ink);
+    background: #fff;
+  }
+  h1 { font-size: 30px; line-height: 1.3; margin: 0 0 6px; }
+  h2 { font-size: 21px; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 24px 0 8px; }
+  p { margin: 10px 0; }
+  ul, ol { margin: 10px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .meta { color: var(--ink-2); font-size: 13px; margin-bottom: 28px; }
+  .meta span { margin-right: 18px; }
+  .lead {
+    background: var(--bg-soft);
+    border-left: 3px solid var(--accent);
+    padding: 14px 18px;
+    margin: 20px 0 8px;
+    border-radius: 0 6px 6px 0;
+  }
+  figure { margin: 18px 0 26px; }
+  figure img {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: block;
+    background: #0f1012;
+  }
+  figcaption { color: var(--ink-2); font-size: 12.5px; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--bg-soft); font-weight: 600; }
+  code { background: var(--bg-soft); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .tag {
+    display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px;
+    background: #eef3ff; color: #2456b8; margin-right: 6px;
+  }
+  .cols { display: flex; gap: 18px; }
+  .cols > div { flex: 1; }
+  .note { font-size: 13px; color: var(--ink-2); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 36px 0; }
+  @media print {
+    body { padding: 0 12mm; max-width: none; }
+    h2 { page-break-after: avoid; }
+    figure { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>小安派工作台 · 上位机功能设计报告</h1>
+<div class="meta">
+  <span>产品：AiPi Workbench（小安派工作台）</span>
+  <span>形态：DeepSeek Harness（DSH）桌面端插件</span>
+  <span>版本：v0.4</span>
+  <span>日期：2026-11-05</span>
+</div>
+
+<div class="lead">
+  一句话定位：<b>让不懂嵌入式的创客，用「拖插件 + 写规则」的方式，把想法变成一块能跑起来的硬件</b>。
+  工作台负责「编排」，DSH 负责「理解与生成」，两者在同一个窗口里完成从想法到下发的闭环。
+</div>
+
+<h2>一、整机界面</h2>
+<p>界面按「左选材、中编排、右看懂、下预览」组织，一屏之内完成全部工作，不需要切换页面：</p>
+<figure>
+  <img src="img/01-overview.png" alt="整机界面">
+  <figcaption>图 1　整机界面：顶部工具栏（工程与设备操作）、左侧插件库、中间画布、右侧属性、底部逻辑预览、最右内嵌 DSH 会话。</figcaption>
+</figure>
+
+<table>
+  <tr><th style="width:18%">区域</th><th>作用</th></tr>
+  <tr><td>顶部工具栏</td><td>新建 / 打开 / 保存、工程名（双击改名）、预览·代码切换、连接设备、支持、下发到设备</td></tr>
+  <tr><td>左侧插件库</td><td>按分类浏览硬件插件，拖到画布使用；可折叠成窄条</td></tr>
+  <tr><td>中间画布</td><td>主机底座 + 6 路 Type-C 接口，插件插上去即成接线</td></tr>
+  <tr><td>右侧属性</td><td>选中节点后显示能力、事件、参数、作者与购买信息</td></tr>
+  <tr><td>底部逻辑</td><td>把接线翻译成「谁触发、做什么」，可切换卡片 / 流图、可运行仿真</td></tr>
+  <tr><td>最右会话</td><td>内嵌 DSH 原生会话，新对话时是官方的欢迎屏</td></tr>
+</table>
+
+<h2>二、硬件插件库</h2>
+<p>插件库是工作台的「选材区」，承载两类东西：<b>唯一的主机底座</b>和<b>可插拔的功能插件</b>。</p>
+
+<figure>
+  <img src="img/02-library.png" alt="插件库">
+  <figcaption>图 2　插件库：顶部分类（全部 / 主机 / 传感器 / 控制类 / 电机类 / AI 语音），主机作为第一项、卡片宽度为两格。</figcaption>
+</figure>
+
+<ul>
+  <li><b>分类过滤</b>：内置 5 个品类，主机单独成类，方便快速定位。</li>
+  <li><b>卡片信息</b>：图标 + 名称 + 品类角标；悬停有用途提示。</li>
+  <li><b>两种放入方式</b>：直接拖到画布，或在属性面板点「放到画布」。</li>
+  <li><b>折叠</b>：折叠后只剩 16px 窄轨（与 DSH 自带折叠图标同尺寸），点击图标展开，不抢画布空间。</li>
+</ul>
+
+<h2>三、编排画布</h2>
+<p>画布是产品的核心心智：<b>一块主机底座 + 六个 Type-C 接口</b>，插件插上去就等于完成了物理接线。</p>
+
+<figure>
+  <img src="img/03-canvas.png" alt="画布">
+  <figcaption>图 3　画布：主机居中，插件按各自接口的方向环绕排布（UART1/2 在下、3/4 在上、5/6 在右），连线自动走线。</figcaption>
+</figure>
+
+<table>
+  <tr><th style="width:22%">能力</th><th>说明</th></tr>
+  <tr><td>通道分配</td><td>插件插入时自动占用最小的空闲 UART（1–6），移除即释放；通道满了会明确提示</td></tr>
+  <tr><td>自动摆放</td><td>按接口方向生成候选位，避开已有节点与画布边界，不会堆在左上角</td></tr>
+  <tr><td>朝向与连线</td><td>插件自动转向对应接口，连线沿接口法线走贝塞尔曲线，颜色随状态变化</td></tr>
+  <tr><td>选中与删除</td><td>点选节点高亮，Delete 或节点右上角 × 删除；选中连线可断开</td></tr>
+  <tr><td>主机唯一性</td><td>主机会话中枢只允许一个，重复添加会被拒绝</td></tr>
+</table>
+
+<p class="note">说明：主机是「底座」语义，不参与逻辑连线；它负责把六路 UART 上的插件编排成一台设备。</p>
+
+<h2>四、属性面板</h2>
+<p>选中任意节点，右侧给出「这是什么、能做什么、怎么买」的信息，避免用户为查一个参数跳出工作台。</p>
+
+<figure>
+  <img src="img/04-property.png" alt="属性面板">
+  <figcaption>图 4　属性面板：图标、名称、型号、品类、能力标识、上报事件 / 可下发参数、作者与购买链接。</figcaption>
+</figure>
+
+<h2>五、逻辑预览（核心创新点）</h2>
+<p>画布只表达「接线」，真正要下发的是「行为」。逻辑预览把接线翻译成人能读懂、也能改的规则。</p>
+
+<h3>5.1 卡片视图</h3>
+<figure>
+  <img src="img/05-logic-cards.png" alt="逻辑卡片">
+  <figcaption>图 5　卡片视图：按「传感器 + 事件」分组，例如「雷达模组·有人靠近 → 开灯 / 语音播报」，动作以胶囊呈现并标注通道与参数。</figcaption>
+</figure>
+
+<h3>5.2 流图视图</h3>
+<figure>
+  <img src="img/06-logic-flow.png" alt="逻辑流图">
+  <figcaption>图 6　流图视图：左列是事件源、右列是动作，自动布局、只读连线，用于快速理解数据流走向。</figcaption>
+</figure>
+
+<h3>5.3 运行与仿真</h3>
+<figure>
+  <img src="img/07-logic-run.png" alt="逻辑运行">
+  <figcaption>图 7　点击「运行」逐条回放：命中规则高亮、画布上起止插件同时发光、底部输出毫秒级执行轨迹。</figcaption>
+</figure>
+
+<table>
+  <tr><th style="width:22%">能力</th><th>说明</th></tr>
+  <tr><td>自动推断</td><td>未编辑时，按「有事件上报的通道 → 有参数下发的通道」自动生成规则，零配置先看到结果</td></tr>
+  <tr><td>固化为规则</td><td>一键把推断结果转成可编辑数据，写入工程文件</td></tr>
+  <tr><td>增删改</td><td>＋规则：选触发通道 / 事件 / 执行通道；✎ 编辑参数；× 删除</td></tr>
+  <tr><td>参数编辑</td><td>按插件能力渲染控件：开关、数字、下拉、文本，杜绝非法输入</td></tr>
+  <tr><td>双向定位</td><td>点规则卡片，画布上对应插件同时高亮</td></tr>
+  <tr><td>可调高度</td><td>上沿可上下拖动，双击复位</td></tr>
+</table>
+
+<h2>六、代码视图与校验</h2>
+<figure>
+  <img src="img/08-code.png" alt="代码视图">
+  <figcaption>图 8　代码视图：左侧是下发用的 DSL（通道 + 规则），右侧是 8 项静态校验结果，红绿一眼可见。</figcaption>
+</figure>
+
+<p>DSL 是「接线 + 行为」的最终产物，也是下发与回读的依据：</p>
+<ul>
+  <li><code>channels</code>：每路 UART 上的插件、能力、事件与参数</li>
+  <li><code>rules</code>：<code>when{uart,event} → then[{uart,action,args}]</code></li>
+</ul>
+
+<h2>七、工程管理</h2>
+<table>
+  <tr><th style="width:22%">能力</th><th>说明</th></tr>
+  <tr><td>新建 / 打开 / 保存</td><td>工具栏三个按钮，支持 Ctrl+S / Ctrl+O / Ctrl+N</td></tr>
+  <tr><td>工程文件</td><td><code>.aipi</code>（JSON）：节点、视角、规则、设备状态，可版本升级</td></tr>
+  <tr><td>自动保存</td><td>改动后 900ms 静默保存；浏览器刷新后自动恢复，且记住文件句柄</td></tr>
+  <tr><td>降级保存</td><td>不支持文件系统 API 的环境自动退回下载，不阻塞流程</td></tr>
+  <tr><td>改名与脏标记</td><td>工程名双击可改，未保存时标题带 ●</td></tr>
+</table>
+
+<h2>八、内嵌 DSH 会话</h2>
+<figure>
+  <img src="img/10-chat.png" alt="内嵌会话">
+  <figcaption>图 9　新对话时直接复用 DSH 官方欢迎屏（Logo、探索未至之境、项目与模式选择器）；开始对话后自动切换为原生会话布局。</figcaption>
+</figure>
+
+<p>价值在于「边聊边做」：用户可以直接说「加一个雷达和灯，有人经过就开灯」，由 DSH 理解并落到画布与规则上。</p>
+
+<h2>九、Agent 能力（让 AI 真正能操作工作台）</h2>
+<p>工作台不只给人用，也向 DSH 开放了一组工具，AI 可以完整走完「搭画布 → 写规则 → 校验 → 编译 → 下发」：</p>
+
+<table>
+  <tr><th style="width:26%">工具</th><th>作用</th></tr>
+  <tr><td><code>workbench_state</code></td><td>读画布：节点、UART 占用、规则、插件目录</td></tr>
+  <tr><td><code>workbench_add_plugin</code></td><td>放插件到画布（自动找空闲通道）</td></tr>
+  <tr><td><code>workbench_remove_plugin</code></td><td>移除插件并释放通道</td></tr>
+  <tr><td><code>workbench_set_rules</code></td><td>整体替换逻辑规则</td></tr>
+  <tr><td><code>workbench_validate</code></td><td>静态校验，返回问题清单</td></tr>
+  <tr><td><code>workbench_compile</code></td><td>编译成下发 DSL（含规则）</td></tr>
+  <tr><td><code>workbench_simulate</code></td><td>只读仿真，返回执行步骤</td></tr>
+  <tr><td><code>workbench_save_project</code> / <code>open_project</code></td><td>读写 <code>.aipi</code> 工程</td></tr>
+  <tr><td><code>workbench_serial_ports</code> / <code>push</code> / <code>serial_read</code> / <code>serial_close</code></td><td>枚举串口、下发 AIPI 帧、回读 self-test</td></tr>
+</table>
+
+<p class="note">下发帧格式：<code>'AIPI' | 版本 | 类型 | 长度 | JSON 负载 | 校验和</code>，打包与解包有单元级往返校验。</p>
+
+<h2>十、交互与视觉规范</h2>
+<ul>
+  <li><b>主题</b>：所有颜色取自 DSH 主题令牌，深浅色自动跟随，不写死色值。</li>
+  <li><b>语言</b>：跟随 DSH 的 <code>&lt;html lang&gt;</code>，中英双语即时切换（含导轨名与提示）。</li>
+  <li><b>对齐</b>：顶部工具栏、底部逻辑条同为通栏，不随左右栏折叠而移位；会话区贯穿整高。</li>
+  <li><b>克制</b>：无多余装饰线、无拖拽抓手图标，状态只靠颜色与下划线表达。</li>
+</ul>
+
+<h2>十一、当前边界与后续规划</h2>
+<table>
+  <tr><th style="width:22%">阶段</th><th>内容</th><th style="width:16%">状态</th></tr>
+  <tr><td>已完成</td><td>插件库、画布编排、属性、规则编辑、仿真、代码视图、工程读写、内嵌会话、Agent 工具与串口下发</td><td>可用</td></tr>
+  <tr><td>下一步</td><td>真机 self-test 回读与「预期 vs 实际」对比；规则冲突检测</td><td>待硬件协议</td></tr>
+  <tr><td>规划中</td><td>多主机 / 多设备工程、插件市场（在线安装）、更丰富的流图交互</td><td>未开始</td></tr>
+</table>
+
+<p class="note">
+  已知限制：
+  ① 会话顶部的「会话标题 / 模式选择器」属于 DSH 会话根组件，插件侧无法取得，因此内嵌会话只呈现内容区与原生 welcome；
+  ② 真机下发依赖 <code>serialport</code>（可选依赖），未安装时串口类工具会给出明确错误而不影响其余功能。
+</p>
+
+<hr>
+<p class="note">本报告基于当前代码仓库实际界面逐屏截图生成，截图脚本：<code>scripts/report-shots.mjs</code>。</p>
+
+</body>
+</html>
