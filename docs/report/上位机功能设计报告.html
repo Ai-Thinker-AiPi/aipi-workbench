@@ -53,7 +53,10 @@
     background: #eef3ff; color: #2456b8; margin-right: 6px;
   }
   .cols { display: flex; gap: 18px; }
-  .cols > div { flex: 1; }
+  .cols > div { flex: 1; min-width: 0; }
+  .cols img { max-height: 560px; }
+  figure.narrow img { max-width: 340px; }
+  figure.narrow img { max-height: 660px; }
   .note { font-size: 13px; color: var(--ink-2); }
   hr { border: none; border-top: 1px solid var(--line); margin: 36px 0; }
   @media print {
@@ -99,7 +102,7 @@
 <p>插件库是工作台的「选材区」，承载两类东西：<b>唯一的主机底座</b>和<b>可插拔的功能插件</b>。</p>
 
 <figure>
-  <img src="img/02-library.png" alt="插件库">
+  <img src="img/02-library.png" alt="插件库" style="max-width:300px">
   <figcaption>图 2　插件库：顶部分类（全部 / 主机 / 传感器 / 控制类 / 电机类 / AI 语音），主机作为第一项、卡片宽度为两格。</figcaption>
 </figure>
 
@@ -114,7 +117,7 @@
 <p>画布是产品的核心心智：<b>一块主机底座 + 六个 Type-C 接口</b>，插件插上去就等于完成了物理接线。</p>
 
 <figure>
-  <img src="img/03-canvas.png" alt="画布">
+  <img src="img/03-canvas.png" alt="画布" style="max-width:430px">
   <figcaption>图 3　画布：主机居中，插件按各自接口的方向环绕排布（UART1/2 在下、3/4 在上、5/6 在右），连线自动走线。</figcaption>
 </figure>
 
@@ -133,7 +136,7 @@
 <p>选中任意节点，右侧给出「这是什么、能做什么、怎么买」的信息，避免用户为查一个参数跳出工作台。</p>
 
 <figure>
-  <img src="img/04-property.png" alt="属性面板">
+  <img src="img/04-property.png" alt="属性面板" style="max-width:320px">
   <figcaption>图 4　属性面板：图标、名称、型号、品类、能力标识、上报事件 / 可下发参数、作者与购买链接。</figcaption>
 </figure>
 
@@ -170,7 +173,7 @@
 
 <h2>六、代码视图与校验</h2>
 <figure>
-  <img src="img/08-code.png" alt="代码视图">
+  <img src="img/08-code.png" alt="代码视图" style="max-width:430px">
   <figcaption>图 8　代码视图：左侧是下发用的 DSL（通道 + 规则），右侧是 8 项静态校验结果，红绿一眼可见。</figcaption>
 </figure>
 
@@ -192,7 +195,7 @@
 
 <h2>八、内嵌 DSH 会话</h2>
 <figure>
-  <img src="img/10-chat.png" alt="内嵌会话">
+  <img src="img/10-chat.png" alt="内嵌会话" style="max-width:430px">
   <figcaption>图 9　新对话时直接复用 DSH 官方欢迎屏（Logo、探索未至之境、项目与模式选择器）；开始对话后自动切换为原生会话布局。</figcaption>
 </figure>
 
@@ -243,3 +246,6 @@
 
 </body>
 </html>
+
+
+

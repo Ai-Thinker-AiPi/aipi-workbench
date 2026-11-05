@@ -29,14 +29,14 @@ const evl = async (e) => (await send('Runtime.evaluate', { expression: e, return
 
 const shot = async (name, box) => {
     const params = { format: 'png' };
-    if (box) params.clip = { x: box[0], y: box[1], width: box[2], height: box[3], scale: 2 };
+    if (box) params.clip = { x: box[0], y: box[1], width: box[2], height: box[3], scale: 2 };  // 2x 清晰度，尺寸可控
     const s = await send('Page.captureScreenshot', params);
     writeFileSync(join(OUT, name + '.png'), Buffer.from(s.result.data, 'base64'));
     console.log('shot ' + name);
 };
 
 await send('Page.enable');
-await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 900, deviceScaleFactor: 2, mobile: false });
+await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false });
 await send('Runtime.enable');
 await sleep(4500);
 await evl(`(() => { const b = [...document.querySelectorAll('button')].find(e => ((e.getAttribute('aria-label')||'')+(e.getAttribute('title')||'')+e.textContent).indexOf('小安派工作台') >= 0); if (b) b.click(); })()`);
@@ -102,3 +102,4 @@ await sleep(600);
 await shot('10-chat', [1180, 0, 420, 900]);
 
 ws.close(); chrome.kill(); process.exit(0);
+
