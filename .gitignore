@@ -3,3 +3,4 @@ assets/preview.html
 *.log
 .DS_Store
 Thumbs.db
+package-lock.json
